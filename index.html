@@ -1,0 +1,436 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="NOLA 2024" />
+        <link rel="apple-touch-icon" href="images/icon.png" />
+
+        <title>NOLA 2024 Map</title>
+        <!-- Leaflet -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet/dist/leaflet.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"
+        />
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+        <script src="multiselect-dropdown.js"></script>
+        <style>
+            :root {
+                --window-height: 100vh;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            #map {
+                height: var(--window-height);
+                width: 100vw;
+            }
+            .marker {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+            }
+            .marker-title {
+                white-space: nowrap;
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-shadow:
+                    -1px -1px 3px #fff,
+                    1px -1px 3px #fff,
+                    -1px 1px 3px #fff,
+                    1px 1px 3px #fff;
+                color: #0e4077;
+            }
+            .marker-cluster-small,
+            .marker-cluster-medium,
+            .marker-cluster-large {
+                color: white !important;
+                text-shadow:
+                    -1px -1px 3px #666,
+                    1px -1px 3px #666,
+                    -1px 1px 3px #666,
+                    1px 1px 3px #666;
+            }
+            .leaflet-marker-icon span {
+                font-size: 14px;
+                font-weight: bold;
+            }
+            .leaflet-bottom.leaflet-left {
+                display: flex;
+                width: 100%;
+                margin-bottom: 20px;
+                justify-content: center;
+            }
+        </style>
+
+        <!-- filter -->
+        <style>
+            #filter-panel {
+                position: fixed;
+                z-index: 1001;
+                left: 0;
+                top: 0;
+                height: var(--window-height);
+                background: #ffffff;
+                box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.3);
+                overflow-x: hidden;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                width: 400px;
+                transform: translateX(-100%);
+                transition: transform 0.2s ease-out;
+            }
+            #filter-panel.open {
+                transform: translateX(0);
+                width: 400px;
+            }
+
+            @media screen and (max-width: 768px) {
+                #filter-panel {
+                    background: rgba(255, 255, 255, 0.9);
+                }
+                #filter-panel.open {
+                    width: 100%;
+                }
+                select {
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    font-size: inherit;
+                    padding: 10px 5px;
+                    color: black;
+                    text-shadow: none;
+                }
+            }
+            #filter-button {
+                position: fixed;
+                z-index: 1001;
+                left: 10px;
+                top: 80px;
+            }
+            .filter {
+                margin-bottom: 20px;
+            }
+            .filter .multiselect-dropdown {
+                margin-top: 10px;
+            }
+            .filter select {
+                width: 100%;
+            }
+            #filter-panel-content {
+                padding: 10px;
+            }
+            #search-filter {
+                margin-bottom: 20px;
+            }
+            #search-input {
+                padding: 10px;
+                margin: 10px 0;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-size: 16px;
+                width: 100%;
+            }
+            #filtered-places {
+                padding: 10px;
+            }
+            .place-item {
+                display: flex;
+                gap: 4px;
+                align-items: center;
+                padding: 10px 0;
+                border-bottom: 1px solid #ccc;
+                cursor: pointer;
+            }
+            #filter-count-container {
+                font-weight: bold;
+                width: 100%;
+                text-align: center;
+            }
+        </style>
+
+        <!-- close button -->
+        <style>
+            #filter-panel-close {
+                z-index: 1002;
+                align-self: flex-end;
+                position: sticky;
+                top: 0;
+                border: none;
+                background: none;
+                cursor: pointer;
+                color: #007aff;
+                padding: 20px;
+                font-weight: bold;
+                font-size: inherit;
+                background: white;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <div id="filter-panel">
+            <button id="filter-panel-close">
+                <span aria-hidden="true">Done</span>
+            </button>
+            <flex id="filter-count-container">
+                Filtered to
+                <span id="filter-count"></span>
+                restaurants
+            </flex>
+
+            <div id="filter-panel-content">
+                <div id="search-filter">
+                    <strong>Keyword filter</strong>
+                    <input
+                        id="search-input"
+                        type="text"
+                        placeholder="Filter by title and description"
+                    />
+                </div>
+                <div id="tag-filter">
+                    <!-- Tag checkboxes will be added here dynamically -->
+                </div>
+            </div>
+
+            <div id="filtered-places">
+                <h3>Filtered places</h3>
+                <div id="places-list"></div>
+            </div>
+        </div>
+        <script src="places.js"></script>
+        <script>
+            // global state
+            var filters = {
+                categories: [],
+                search: "",
+            };
+
+            // map state
+            var map = L.map("map").setView([29.9509, -90.0758], 15);
+            L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                {
+                    attribution:
+                        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                },
+            ).addTo(map);
+
+            var markers = L.markerClusterGroup({
+                showCoverageOnHover: true,
+                removeOutsideVisibleBounds: true,
+                disableClusteringAtZoom: 15,
+            });
+
+            // render pins on map
+            function renderPins(data) {
+                markers.clearLayers();
+                data.forEach((place) => {
+                    var marker = L.marker([place.latitude, place.longitude], {
+                        icon: new L.DivIcon({
+                            className: "marker",
+                            html: `<div class="marker"><img src="images/${place.icon}.png" width="30" height="30"/><span class="marker-title">${place.name}</span></div>`,
+                        }),
+                    });
+                    marker.addEventListener("click", () => {
+                        window.open(place.menu_url ?? place.url, "_blank");
+                    });
+                    markers.addLayer(marker);
+                });
+                map.addLayer(markers);
+            }
+
+            // render list in filter panel
+            function renderResultsList(data) {
+                const resultsPanel = document.getElementById("places-list");
+                resultsPanel.innerHTML = ""; // clear the panel first
+                data.forEach((place) => {
+                    const resultItem = document.createElement("div");
+                    resultItem.className = "place-item";
+                    resultItem.innerHTML = `<img src="images/${place.icon}.png" width="30" height="30"/> ${place.name}`;
+                    resultItem.addEventListener("click", () => {
+                        map.flyTo(
+                            [place.latitude, place.longitude],
+                            map.getMaxZoom(),
+                        );
+                        if (window.matchMedia("(max-width: 768px)").matches) {
+                            document
+                                .getElementById("filter-panel")
+                                .classList.remove("open");
+                        }
+                    });
+                    resultsPanel.appendChild(resultItem);
+                });
+            }
+
+            // on keyword change update filters
+            document
+                .getElementById("search-input")
+                .addEventListener("input", function () {
+                    filters.search = this.value.toLowerCase();
+                    applyFiltersAndRender();
+                });
+            // close filter panel
+            document
+                .getElementById("filter-panel-close")
+                .addEventListener("click", function () {
+                    document
+                        .getElementById("filter-panel")
+                        .classList.remove("open", "full-width");
+                });
+            var FilterButton = L.Control.extend({
+                onAdd: function () {
+                    var button = L.DomUtil.create("a");
+                    button.innerHTML = "&#x1F50D";
+                    button.style.display = "flex";
+                    button.style.alignItems = "center";
+                    button.style.justifyContent = "center";
+                    button.style.fontSize = "40px";
+                    button.style.cursor = "pointer";
+                    button.style.width = "60px";
+                    button.style.height = "60px";
+                    button.style.border = "none";
+                    button.style.backgroundColor = "white";
+                    button.style.borderRadius = "50%";
+                    button.style.boxShadow = "0px 0px 5px 2px rgba(0,0,0,0.3)"; // add a drop shadow
+
+                    L.DomEvent.on(button, "click", function () {
+                        var filterPanel =
+                            document.getElementById("filter-panel");
+                        if (filterPanel.classList.contains("open")) {
+                            filterPanel.classList.remove("open");
+                            return;
+                        }
+                        filterPanel.classList.add("open");
+                    });
+
+                    return button;
+                },
+            });
+            map.addControl(new FilterButton({ position: "bottomleft" }));
+
+            // render tags in filter panel
+            function renderCategoryFilter(categories) {
+                const sectionEl = document.getElementById("tag-filter");
+
+                const divEl = document.createElement("div");
+                divEl.classList.add("filter");
+                divEl.innerHTML = `<strong>Categories</strong>`;
+
+                const selectEl = document.createElement("select");
+                selectEl.name = "Categories";
+                selectEl.multiple = true;
+                selectEl.setAttribute("multiselect-search", "true");
+                selectEl.setAttribute("multiselect-select-all", "true");
+                categories.forEach((value) => {
+                    const optionEl = document.createElement("option");
+                    optionEl.value = value;
+                    optionEl.textContent = value;
+                    optionEl.selected = false;
+                    selectEl.appendChild(optionEl);
+                });
+
+                divEl.appendChild(selectEl);
+                sectionEl.appendChild(divEl);
+
+                // handle filter changes
+                document.querySelectorAll("#tag-filter select").forEach((el) =>
+                    el.addEventListener("change", (event) => {
+                        const { name, options } = event.target;
+                        filters.categories = Array.from(options)
+                            .filter((o) => o.selected)
+                            .map((o) => o.value);
+                        applyFiltersAndRender();
+                    }),
+                );
+                MultiselectDropdown(window.MultiselectDropdownOptions);
+            }
+
+            // filter pins and render map
+            function applyFiltersAndRender() {
+                const filteredData = places.filter((place) => {
+                    // Search filter
+                    if (
+                        filters.search &&
+                        !(
+                            place.name.toLowerCase().includes(filters.search) ||
+                            place.categories
+                                .join(" ")
+                                .toLowerCase()
+                                .includes(filters.search)
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    // Tag filters
+                    if (filters.categories.length > 0) {
+                        for (const category of filters.categories) {
+                            if (place.categories.includes(category))
+                                return true;
+                        }
+                        return false;
+                    }
+
+                    return true;
+                });
+                renderPins(filteredData);
+                renderResultsList(filteredData);
+                document.getElementById("filter-count").innerHTML =
+                    filteredData.length;
+            }
+
+            // fetch data and set up map
+            window.addEventListener("load", () => {
+                var categories = new Set();
+                var prices = new Set();
+
+                places.forEach((place) => {
+                    categories.add(...place.categories);
+                });
+
+                renderCategoryFilter(
+                    Array.from(categories).sort(),
+                    "tag-filter",
+                );
+                renderPins(places);
+                renderResultsList(places);
+                document.getElementById("filter-count").innerHTML =
+                    places.length;
+                if (window.matchMedia("(min-width: 769px)").matches) {
+                    document
+                        .getElementById("filter-panel")
+                        .classList.add("open");
+                }
+            });
+        </script>
+
+        <script>
+            function setHeight() {
+                const doc = document.documentElement;
+                doc.style.setProperty(
+                    "--window-height",
+                    `${window.innerHeight}px`,
+                );
+            }
+            window.addEventListener("resize", setHeight);
+            setHeight();
+        </script>
+    </body>
+</html>
